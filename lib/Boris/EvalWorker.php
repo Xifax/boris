@@ -1,9 +1,13 @@
 <?php
 
+require_once 'Colorful.php';
+
 /**
  * EvalWorker is reponsible for evaluating PHP expressions in forked processes.
  */
 class Boris_EvalWorker {
+    use Colorful;
+
   const ABNORMAL_EXIT = 65280;
   const DONE   = "\0";
   const EXITED = "\1";
@@ -65,8 +69,7 @@ class Boris_EvalWorker {
         }
 
         if (preg_match('/\s*return\b/i', $__input)) {
-          echo " → ";
-          var_dump($__result);
+          $this->_put($__result);
         }
         $this->_expungeOldWorker();
       }
@@ -87,4 +90,49 @@ class Boris_EvalWorker {
     posix_kill($this->_ppid, SIGTERM);
     pcntl_signal_dispatch();
   }
+
+  /**
+   * Output to console with color!
+   */
+  private function _put() {
+
+    // Dump all variables as strings
+    $result = '';
+    foreach(func_get_args() as $object)
+        $result .= "\n->> " . var_export($object, true) . "\n";
+
+    // Match all values
+    preg_match_all("/'.*?'/", $result, $matches);
+    $matches = array_unique(array_pop($matches));
+
+    // Colorize strings
+    $replacements = [];
+    foreach($matches as $match)
+        $replacements[] = sprintf(
+            $this->foreground,
+            $this->colors['green'],
+            $match
+        );
+
+    // Colorize keywords and tokens
+    $keywords = [
+        '=>' => 'blue',
+        '->>' => 'cyan',
+        'array' => 'white',
+        '(' => 'white',
+        ')' => 'white',
+        'NULL' => 'purple',
+        'false' => 'purple',
+        'true' => 'purple',
+    ];
+
+    // Additional replacements for keywords
+    $matches = array_merge($matches, array_keys($keywords));
+    $replacements = array_merge($replacements, $this->colorize($keywords));
+
+    // Colorize and output to console
+    echo str_replace($matches, $replacements, $result);
+
+  }
+
 }
